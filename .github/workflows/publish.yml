@@ -1,0 +1,39 @@
+name: Publish
+
+# Push a tag like v1.0.0 to publish that version to GitHub Packages.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=1.0.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test and publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          ./gradlew :logkit:testReleaseUnitTest
+          :logkit:publishReleasePublicationToGitHubPackagesRepository
+          -PlibVersion=${{ steps.version.outputs.value }} --stacktrace
